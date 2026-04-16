@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice to Text</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 160px; height: 48px; overflow: hidden; background: transparent; font-family: -apple-system, sans-serif; -webkit-app-region: drag; }
+    .c { display:flex; align-items:center; justify-content:center; width:160px; height:48px; -webkit-app-region:no-drag; }
+    .w { position:relative; display:flex; align-items:center; justify-content:center; border-radius:999px; cursor:pointer; user-select:none;
+      transition: width 600ms cubic-bezier(0.34,1.56,0.64,1), height 600ms cubic-bezier(0.34,1.56,0.64,1), background 300ms, border-color 300ms;
+      width:36px; height:36px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.08); }
+    .w:hover { background:rgba(255,255,255,0.14); }
+    .w.recording { width:140px; height:36px; background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.12); }
+    .w.processing { width:80px; height:36px; background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.08); }
+    .w.done { width:36px; height:36px; background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.25); }
+    .e { position:absolute; transition: opacity 400ms, transform 400ms; }
+    .e.off { opacity:0; transform:scale(0.4); pointer-events:none; }
+    .e.on { opacity:1; transform:scale(1); }
+    .bars { display:flex; align-items:center; gap:5px; }
+    .bar { width:3px; border-radius:2px; background:rgba(255,255,255,0.6); height:3px; transition:height 60ms linear; }
+    .sq { position:absolute; right:10px; width:10px; height:10px; background:rgba(255,255,255,0.2); border-radius:2px; }
+    .sp { width:14px; height:14px; border:2px solid rgba(255,255,255,0.12); border-top-color:rgba(255,255,255,0.5); border-radius:50%; }
+    .sp.on { animation:spin 0.7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="c">
+  <div class="w" id="w">
+    <svg class="e on" id="mic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+    </svg>
+    <div class="e off bars" id="bars"><div class="bar" id="b0"></div><div class="bar" id="b1"></div><div class="bar" id="b2"></div><div class="bar" id="b3"></div><div class="bar" id="b4"></div></div>
+    <div class="e off sq" id="sq"></div>
+    <div class="e off sp" id="sp"></div>
+    <svg class="e off" id="chk" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+</div>
+<script>
+const { clipboard } = require('electron');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const w = document.getElementById('w');
+const els = { mic:document.getElementById('mic'), bars:document.getElementById('bars'), sq:document.getElementById('sq'), sp:document.getElementById('sp'), chk:document.getElementById('chk') };
+
+let state = 'idle', audioCtx, analyser, stream, animId, chunks = [];
+let recognition = null;
+let speechResult = '';
+let speechGotResult = false;
+
+function on(el) { el.classList.remove('off'); el.classList.add('on'); }
+function off(el) { el.classList.remove('on'); el.classList.add('off'); }
+function go(s) {
+  state = s;
+  w.className = 'w' + (s !== 'idle' ? ' ' + s : '');
+  s === 'idle' ? on(els.mic) : off(els.mic);
+  s === 'recording' ? (on(els.bars), on(els.sq)) : (off(els.bars), off(els.sq));
+  s === 'processing' ? on(els.sp) : off(els.sp);
+  s === 'done' ? on(els.chk) : off(els.chk);
+}
+
+function cleanup() {
+  cancelAnimationFrame(animId);
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
+  analyser = null;
+}
+
+function stopRecognition() {
+  if (recognition) { try { recognition.abort(); } catch(e) {} recognition = null; }
+}
+
+async function startRec() {
+  if (state !== 'idle') return;
+  go('recording');
+  chunks = [];
+  speechResult = '';
+  speechGotResult = false;
+
+  // Start speech recognition (Chrome's built-in, same as web app)
+  try {
+    const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (SR) {
+      recognition = new SR();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = function(event) {
+        let final = '', interim = '';
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) final += event.results[i][0].transcript;
+          else interim += event.results[i][0].transcript;
+        }
+        speechResult = final || interim;
+        speechGotResult = true;
+      };
+
+      recognition.onerror = function(e) {
+        console.log('[Speech] Error:', e.error);
+        // If speech recognition fails, fall back to Whisper
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          console.log('[Speech] Falling back to Whisper');
+          stopRecognition();
+        }
+      };
+
+      recognition.onend = function() {
+        // If still recording and got results, process them
+        if (state === 'recording' && speechGotResult && speechResult) {
+          finishWithText(speechResult.trim());
+        } else if (state === 'recording') {
+          // Restart if no result yet
+          try { recognition.start(); } catch(e) {}
+        }
+      };
+
+      recognition.start();
+    }
+  } catch(e) {
+    console.log('[Speech] Not available:', e);
+  }
+
+  // Start mic for waveform visualization
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new AudioContext();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.75;
+    src.connect(analyser);
+
+    // Also capture PCM for Whisper fallback
+    const proc = audioCtx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = function(e) { if (state === 'recording') chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+    src.connect(proc);
+    const g = audioCtx.createGain(); g.gain.value = 0;
+    proc.connect(g); g.connect(audioCtx.destination);
+
+    tick();
+  } catch(e) { console.error('Mic error:', e); }
+}
+
+function tick() {
+  if (state !== 'recording' || !analyser) return;
+  animId = requestAnimationFrame(tick);
+  const freq = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(freq);
+  for (let i = 0; i < 5; i++) {
+    document.getElementById('b'+i).style.height = Math.max(4, (freq[Math.floor((i/5)*20)+3]||0)/255*30+4) + 'px';
+  }
+}
+
+function finishWithText(text) {
+  cleanup();
+  stopRecognition();
+  if (text) {
+    clipboard.writeText(text);
+    console.log('[Widget] Copied:', text);
+  }
+  go('done');
+  setTimeout(() => go('idle'), 1500);
+}
+
+async function stopAndTranscribe() {
+  if (state !== 'recording') return;
+
+  // If speech recognition got a result, use it (same as web app)
+  if (speechGotResult && speechResult) {
+    finishWithText(speechResult.trim());
+    return;
+  }
+
+  // Otherwise fall back to Whisper via IPC
+  stopRecognition();
+  const nativeRate = audioCtx ? audioCtx.sampleRate : 44100;
+  let len = 0; for (const c of chunks) len += c.length;
+  const merged = new Float32Array(len);
+  let off = 0; for (const c of chunks) { merged.set(c, off); off += c.length; }
+  chunks = [];
+  cleanup();
+  go('processing');
+
+  let samples = merged;
+  if (nativeRate !== 16000 && merged.length > 0) {
+    const ratio = nativeRate / 16000;
+    const newLen = Math.round(merged.length / ratio);
+    samples = new Float32Array(newLen);
+    for (let i = 0; i < newLen; i++) {
+      const si = i * ratio, lo = Math.floor(si), hi = Math.min(lo+1, merged.length-1), f = si - lo;
+      samples[i] = merged[lo]*(1-f) + merged[hi]*f;
+    }
+  }
+
+  const wav = encodeWav(samples, 16000);
+  const tmpFile = path.join(os.tmpdir(), 'vtt-' + Date.now() + '.wav');
+  fs.writeFileSync(tmpFile, Buffer.from(wav));
+
+  try {
+    const { ipcRenderer } = require('electron');
+    const result = await ipcRenderer.invoke('transcribe', wav);
+    const text = (result && result.text) ? result.text.trim() : '';
+    if (text) { clipboard.writeText(text); console.log('[Widget] Whisper copied:', text); }
+    go('done');
+    setTimeout(() => go('idle'), 1500);
+  } catch(e) {
+    console.error('[Widget] Whisper error:', e);
+    go('idle');
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch(e) {}
+  }
+}
+
+function encodeWav(samples, sr) {
+  const ds = samples.length * 2;
+  const buf = new ArrayBuffer(44 + ds);
+  const v = new DataView(buf);
+  const ws = (v,o,s) => { for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  ws(v,0,'RIFF'); v.setUint32(4,36+ds,true); ws(v,8,'WAVE'); ws(v,12,'fmt ');
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); ws(v,36,'data'); v.setUint32(40,ds,true);
+  let o = 44;
+  for(let i=0;i<samples.length;i++) { const s=Math.max(-1,Math.min(1,samples[i])); v.setInt16(o,s<0?s*0x8000:s*0x7FFF,true); o+=2; }
+  return buf;
+}
+
+w.addEventListener('click', () => {
+  if (state === 'idle') startRec();
+  else if (state === 'recording') stopAndTranscribe();
+});
+w.addEventListener('contextmenu', e => e.preventDefault());
+
+const { ipcRenderer: ipc2 } = require('electron');
+ipc2.on('toggle-recording', () => {
+  if (state === 'idle') startRec();
+  else if (state === 'recording') stopAndTranscribe();
+});
+ipc2.on('start-recording', () => {
+  if (state === 'idle') startRec();
+});
+ipc2.on('stop-recording', () => {
+  if (state === 'recording') stopAndTranscribe();
+});
+</script>
+</body>
+</html>

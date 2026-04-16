@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice to Text — Setup</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; color: #fff; font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+    .container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 48px; }
+    .step { display: none; flex-direction: column; align-items: center; text-align: center; gap: 20px; width: 100%; max-width: 440px; animation: fadeIn 400ms ease-out; }
+    .step.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .step-icon { width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+    .step-icon svg { width: 28px; height: 28px; fill: #fff; }
+    h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+    p { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.6); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 28px; border-radius: 8px; border: none; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 250ms, transform 150ms; min-width: 160px; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: #fff; color: #0a0a0f; }
+    .btn-primary:hover { background: #e5e5e5; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .dots { display: flex; gap: 8px; padding: 20px 0; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); transition: background 300ms, transform 300ms; }
+    .dot.active { background: #fff; transform: scale(1.2); }
+    .dot.done { background: #22c55e; }
+    .progress-container { width: 100%; margin-top: 12px; }
+    .progress-bg { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; background: #3b82f6; width: 0%; transition: width 300ms ease; }
+    .progress-stats { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); }
+    .perm-status { font-size: 13px; margin-top: 4px; min-height: 20px; }
+    .perm-status.ok { color: #22c55e; }
+    .perm-status.fail { color: #ef4444; }
+    .summary-items { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; }
+    .summary-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 8px; background: rgba(255,255,255,0.04); }
+    .summary-item .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .summary-item .ic svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.7); }
+    .summary-item .tx { font-size: 13px; color: rgba(255,255,255,0.7); }
+    .summary-item .tx strong { color: #fff; font-weight: 500; }
+    .model-info { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Step 1: Welcome -->
+  <div class="step active" id="s1">
+    <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></div>
+    <h1>Welcome to Voice to Text</h1>
+    <p>Transcribe your voice locally using OpenAI's Whisper model. Click the floating widget to record — your transcript is instantly copied to clipboard. Private, fast, fully offline.</p>
+    <button class="btn btn-primary" onclick="go(2)">Get Started</button>
+  </div>
+
+  <!-- Step 2: Mic Permission -->
+  <div class="step" id="s2">
+    <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></div>
+    <h1>Microphone Access</h1>
+    <p>Voice to Text needs your microphone to capture audio. All processing happens locally — nothing leaves your machine.</p>
+    <button class="btn btn-primary" id="mic-btn" onclick="grantMic()">Grant Permission</button>
+    <div class="perm-status" id="mic-st"></div>
+  </div>
+
+  <!-- Step 3: Download Model (auto, no choice) -->
+  <div class="step" id="s3">
+    <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg></div>
+    <h1>Downloading Whisper Model</h1>
+    <p>Setting up the Whisper Small English model (~466 MB) for high-accuracy local transcription. This only happens once.</p>
+    <div class="progress-container">
+      <div class="progress-bg"><div class="progress-fill" id="pf"></div></div>
+      <div class="progress-stats"><span id="pp">Preparing...</span><span id="pd"></span></div>
+    </div>
+    <p class="model-info">Model: Xenova/whisper-small.en (ONNX quantized)</p>
+  </div>
+
+  <!-- Step 4: Done -->
+  <div class="step" id="s4">
+    <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#22c55e"/></svg></div>
+    <h1>You're All Set</h1>
+    <p>Everything is configured. Here's how to use Voice to Text:</p>
+    <div class="summary-items">
+      <div class="summary-item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z"/></svg></div><div class="tx">Press <strong>Ctrl+Shift+Space</strong> from anywhere to start recording</div></div>
+      <div class="summary-item"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"/></svg></div><div class="tx">Or click the <strong>floating widget</strong> on your screen</div></div>
+      <div class="summary-item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></div><div class="tx">Transcribed text is <strong>auto-copied</strong> to your clipboard</div></div>
+    </div>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);margin-top:12px;">Choose your shortcut mode:</p>
+    <div style="display:flex;gap:8px;width:100%;">
+      <div id="mode-toggle" onclick="setMode('toggle')" style="flex:1;padding:12px;border-radius:8px;border:2px solid #3b82f6;background:rgba(59,130,246,0.08);cursor:pointer;text-align:center;">
+        <div style="font-size:13px;font-weight:500;color:#fff;">Toggle</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Press once to start, again to stop</div>
+      </div>
+      <div id="mode-ptt" onclick="setMode('push-to-talk')" style="flex:1;padding:12px;border-radius:8px;border:2px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);cursor:pointer;text-align:center;">
+        <div style="font-size:13px;font-weight:500;color:#fff;">Hold to Talk</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Hold shortcut, release to stop</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-finish" onclick="finish()" style="margin-top:12px;">Start Using Voice to Text</button>
+  </div>
+
+  <div class="dots"><div class="dot active" id="d1"></div><div class="dot" id="d2"></div><div class="dot" id="d3"></div><div class="dot" id="d4"></div></div>
+</div>
+<script>
+var cur = 1;
+var selectedMode = 'toggle';
+
+function setMode(mode) {
+  selectedMode = mode;
+  var t = document.getElementById('mode-toggle');
+  var p = document.getElementById('mode-ptt');
+  if (mode === 'toggle') {
+    t.style.borderColor = '#3b82f6'; t.style.background = 'rgba(59,130,246,0.08)';
+    p.style.borderColor = 'rgba(255,255,255,0.1)'; p.style.background = 'rgba(255,255,255,0.03)';
+  } else {
+    p.style.borderColor = '#3b82f6'; p.style.background = 'rgba(59,130,246,0.08)';
+    t.style.borderColor = 'rgba(255,255,255,0.1)'; t.style.background = 'rgba(255,255,255,0.03)';
+  }
+}
+function go(n) {
+  document.getElementById('s'+cur).classList.remove('active');
+  document.getElementById('s'+n).classList.add('active');
+  for (var i=1;i<=4;i++) { var d=document.getElementById('d'+i); d.classList.remove('active','done'); if(i<n) d.classList.add('done'); else if(i===n) d.classList.add('active'); }
+  cur = n;
+  if (n === 3) startDownload();
+}
+
+async function grantMic() {
+  var st = document.getElementById('mic-st');
+  var btn = document.getElementById('mic-btn');
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    stream.getTracks().forEach(function(t){t.stop();});
+    st.textContent = '✓ Microphone access granted';
+    st.className = 'perm-status ok';
+    btn.textContent = 'Continue';
+    btn.onclick = function() { go(3); };
+  } catch(e) {
+    st.textContent = 'Permission denied. Please grant access in system settings.';
+    st.className = 'perm-status fail';
+  }
+}
+
+async function startDownload() {
+  var pf = document.getElementById('pf');
+  var pp = document.getElementById('pp');
+  var pd = document.getElementById('pd');
+
+  if (window.electronAPI) {
+    window.electronAPI.onDownloadProgress(function(p) {
+      var pct = Math.round(p.percentage || 0);
+      pf.style.width = pct + '%';
+      pp.textContent = pct + '%';
+      if (p.file) pd.textContent = p.file;
+      if (pct >= 100) { pp.textContent = 'Complete'; setTimeout(function(){go(4);}, 800); }
+    });
+    try {
+      await window.electronAPI.downloadModel('small.en');
+      // If no progress events, model was already cached
+      pf.style.width = '100%';
+      pp.textContent = 'Model ready';
+      setTimeout(function(){go(4);}, 600);
+    } catch(e) {
+      pp.textContent = 'Download failed: ' + (e.message || e);
+      pd.textContent = 'Please restart the app to try again.';
+    }
+  } else {
+    // Simulate
+    var pct = 0;
+    var iv = setInterval(function() {
+      pct += Math.random()*15+5; if(pct>100) pct=100;
+      pf.style.width = pct+'%'; pp.textContent = Math.round(pct)+'%';
+      if(pct>=100) { clearInterval(iv); setTimeout(function(){go(4);},600); }
+    }, 300);
+  }
+}
+
+async function finish() {
+  if (window.electronAPI) {
+    try {
+      await window.electronAPI.updateSettings({ hotkeyMode: selectedMode });
+      await window.electronAPI.completeOnboarding();
+    } catch(e) { window.close(); }
+  } else { window.close(); }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('btn-finish');
+  if (btn) btn.addEventListener('click', finish);
+});
+</script>
+</body>
+</html>

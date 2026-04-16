@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head><title>Recorder</title></head>
+<body>
+<script>
+var mediaStream = null;
+var audioCtx = null;
+var chunks = [];
+var recording = false;
+var silenceStart = 0;
+var hasSpoken = false;
+var SILENCE_THRESHOLD = 0.012;
+var SILENCE_MS = 2000;
+var MAX_WAIT_MS = 10000;
+var startTime = 0;
+
+window.addEventListener('message', function(e) {
+  if (e.data === 'start') startRecording();
+  if (e.data === 'stop') stopRecording();
+});
+
+// Also listen via electronAPI
+if (window.electronAPI) {
+  window.electronAPI.onToggleRecording(function() {
+    if (!recording) startRecording();
+    else stopRecording();
+  });
+}
+
+async function startRecording() {
+  if (recording) return;
+  recording = true;
+  chunks = [];
+  silenceStart = 0;
+  hasSpoken = false;
+  startTime = performance.now();
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new AudioContext();
+    var src = audioCtx.createMediaStreamSource(mediaStream);
+
+    var analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+
+    var processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = function(e) {
+      if (!recording) return;
+      chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    };
+    src.connect(processor);
+    var gain = audioCtx.createGain();
+    gain.gain.value = 0;
+    processor.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    // Silence detection loop
+    var timeData = new Uint8Array(analyser.fftSize);
+    function check() {
+      if (!recording) return;
+      requestAnimationFrame(check);
+
+      analyser.getByteTimeDomainData(timeData);
+      var sum = 0;
+      for (var i = 0; i < timeData.length; i++) {
+        var n = (timeData[i] - 128) / 128;
+        sum += n * n;
+      }
+      var rms = Math.sqrt(sum / timeData.length);
+
+      if (rms > SILENCE_THRESHOLD) {
+        hasSpoken = true;
+        silenceStart = 0;
+      } else {
+        if (silenceStart === 0) silenceStart = performance.now();
+        else if (hasSpoken && performance.now() - silenceStart > SILENCE_MS) {
+          stopRecording();
+          return;
+        }
+      }
+
+      if (!hasSpoken && performance.now() - startTime > MAX_WAIT_MS) {
+        cancelRecording();
+      }
+    }
+    check();
+  } catch(e) {
+    recording = false;
+    if (window.electronAPI) {
+      window.electronAPI.copyToClipboard(''); // signal error
+    }
+  }
+}
+
+function stopRecording() {
+  if (!recording) return;
+  recording = false;
+
+  // Merge chunks
+  var totalLen = 0;
+  for (var i = 0; i < chunks.length; i++) totalLen += chunks[i].length;
+  var merged = new Float32Array(totalLen);
+  var offset = 0;
+  for (var i = 0; i < chunks.length; i++) {
+    merged.set(chunks[i], offset);
+    offset += chunks[i].length;
+  }
+  chunks = [];
+
+  // Downsample to 16kHz
+  var nativeRate = audioCtx ? audioCtx.sampleRate : 44100;
+  cleanup();
+
+  var samples = merged;
+  if (nativeRate !== 16000 && merged.length > 0) {
+    var ratio = nativeRate / 16000;
+    var newLen = Math.round(merged.length / ratio);
+    samples = new Float32Array(newLen);
+    for (var i = 0; i < newLen; i++) {
+      var srcIdx = i * ratio;
+      var lo = Math.floor(srcIdx);
+      var hi = Math.min(lo + 1, merged.length - 1);
+      var frac = srcIdx - lo;
+      samples[i] = merged[lo] * (1 - frac) + merged[hi] * frac;
+    }
+  }
+
+  // Encode WAV
+  var wav = encodeWav(samples, 16000);
+
+  // Send to main process for transcription
+  if (window.electronAPI && samples.length > 0) {
+    window.electronAPI.transcribe(wav).catch(function(e) {
+      console.error('Transcription error:', e);
+    });
+  }
+}
+
+function cancelRecording() {
+  recording = false;
+  chunks = [];
+  cleanup();
+}
+
+function cleanup() {
+  if (mediaStream) { mediaStream.getTracks().forEach(function(t) { t.stop(); }); mediaStream = null; }
+  if (audioCtx) { audioCtx.close().catch(function(){}); audioCtx = null; }
+}
+
+function encodeWav(samples, sampleRate) {
+  var dataSize = samples.length * 2;
+  var buffer = new ArrayBuffer(44 + dataSize);
+  var v = new DataView(buffer);
+  writeStr(v, 0, 'RIFF');
+  v.setUint32(4, 36 + dataSize, true);
+  writeStr(v, 8, 'WAVE');
+  writeStr(v, 12, 'fmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  writeStr(v, 36, 'data');
+  v.setUint32(40, dataSize, true);
+  var off = 44;
+  for (var i = 0; i < samples.length; i++) {
+    var s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    off += 2;
+  }
+  return buffer;
+}
+
+function writeStr(v, o, s) {
+  for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i));
+}
+</script>
+</body>
+</html>

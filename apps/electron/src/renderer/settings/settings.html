@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Voice to Text</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0f;
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .header {
+      padding: 24px 28px 0;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    .content {
+      padding: 20px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Form group ── */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* ── Text input ── */
+    input[type="text"] {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 200ms ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: #3b82f6;
+    }
+
+    input[type="text"]::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* ── Select ── */
+    select {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 200ms ease;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='rgba(255,255,255,0.5)'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    select:focus {
+      border-color: #3b82f6;
+    }
+
+    select option {
+      background: #1a1a2e;
+      color: #ffffff;
+    }
+
+    /* ── Toggle switch ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      transition: background 200ms ease;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      transition: transform 200ms ease;
+    }
+
+    .toggle input:checked + .toggle-track {
+      background: #3b82f6;
+    }
+
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(18px);
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* ── Save button ── */
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 4px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 24px;
+      border-radius: 6px;
+      border: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 200ms ease, transform 150ms ease;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #0a0a0f;
+    }
+
+    .btn-primary:hover { background: #e5e5e5; }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+    }
+
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
+
+    /* ── Status message ── */
+    .status-msg {
+      font-size: 13px;
+      color: #22c55e;
+      text-align: right;
+      min-height: 20px;
+      transition: opacity 300ms ease;
+    }
+
+    .status-msg.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Settings</h1>
+  </div>
+
+  <div class="content">
+    <!-- Hotkey -->
+    <div class="form-group">
+      <label for="hotkey">Global Hotkey</label>
+      <input type="text" id="hotkey" placeholder="e.g. Ctrl+Shift+Space" readonly>
+    </div>
+
+    <!-- Model -->
+    <div class="form-group">
+      <label for="model">Whisper Model</label>
+      <select id="model">
+        <option value="tiny.en">tiny.en (~75 MB)</option>
+        <option value="base.en">base.en (~142 MB)</option>
+        <option value="small.en">small.en (~466 MB)</option>
+        <option value="medium.en">medium.en (~1.5 GB)</option>
+      </select>
+    </div>
+
+    <!-- Language -->
+    <div class="form-group">
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Toggles -->
+    <div class="toggle-row">
+      <span class="toggle-label">Auto-copy to clipboard</span>
+      <label class="toggle">
+        <input type="checkbox" id="autoCopy">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Show floating widget</span>
+      <label class="toggle">
+        <input type="checkbox" id="showWidget">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label">Launch at startup</span>
+      <label class="toggle">
+        <input type="checkbox" id="launchStartup">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="actions">
+      <span class="status-msg hidden" id="status-msg">Settings saved</span>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+
+  <script>
+    let currentSettings = {};
+
+    async function loadSettings() {
+      if (!window.electronAPI) return;
+      try {
+        const settings = await window.electronAPI.getSettings();
+        currentSettings = settings;
+
+        document.getElementById('hotkey').value = settings.hotkeyAccelerator || '';
+        document.getElementById('model').value = settings.modelName || 'base.en';
+        document.getElementById('language').value = settings.language || 'en';
+        document.getElementById('autoCopy').checked = settings.autoCopyToClipboard !== false;
+        document.getElementById('showWidget').checked = settings.showFloatingWidget !== false;
+        document.getElementById('launchStartup').checked = settings.launchAtStartup === true;
+      } catch (e) {
+        console.error('Failed to load settings:', e);
+      }
+    }
+
+    async function saveSettings() {
+      if (!window.electronAPI) return;
+
+      const newSettings = {
+        hotkeyAccelerator: document.getElementById('hotkey').value,
+        modelName: document.getElementById('model').value,
+        language: document.getElementById('language').value,
+        autoCopyToClipboard: document.getElementById('autoCopy').checked,
+        showFloatingWidget: document.getElementById('showWidget').checked,
+        launchAtStartup: document.getElementById('launchStartup').checked,
+      };
+
+      try {
+        await window.electronAPI.updateSettings(newSettings);
+        currentSettings = { ...currentSettings, ...newSettings };
+
+        const statusEl = document.getElementById('status-msg');
+        statusEl.classList.remove('hidden');
+        setTimeout(() => statusEl.classList.add('hidden'), 2000);
+      } catch (e) {
+        console.error('Failed to save settings:', e);
+      }
+    }
+
+    // Hotkey capture: listen for key combos when the hotkey field is focused
+    const hotkeyInput = document.getElementById('hotkey');
+    hotkeyInput.addEventListener('keydown', (e) => {
+      e.preventDefault();
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.metaKey) parts.push('Cmd');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+
+      const key = e.key;
+      if (!['Control', 'Meta', 'Alt', 'Shift'].includes(key)) {
+        parts.push(key.length === 1 ? key.toUpperCase() : key);
+        hotkeyInput.value = parts.join('+');
+      }
+    });
+
+    // Load settings on page load
+    loadSettings();
+  </script>
+</body>
+</html>

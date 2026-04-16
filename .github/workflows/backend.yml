@@ -1,0 +1,90 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-dotnet:
+    name: Build & Test .NET API Gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: services/api-gateway
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: services/api-gateway
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal
+        working-directory: services/api-gateway
+
+  test-python-lms-scraper:
+    name: Test LMS Scraper Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: services/lms-scraper
+
+      - name: Run unit tests (no integration)
+        run: pytest tests/ -v -m "not integration" --tb=short
+        working-directory: services/lms-scraper
+
+  test-python-ai-agent:
+    name: Test AI Agent Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: services/ai-agent
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        working-directory: services/ai-agent
+        continue-on-error: true
+
+  test-python-scheduler:
+    name: Test Scheduler Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        working-directory: services/scheduler
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        working-directory: services/scheduler
+        continue-on-error: true

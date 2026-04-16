@@ -1,0 +1,21 @@
+{
+  "name": "voice-to-text",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local voice-to-text using OpenAI's Whisper model. Desktop app (Electron) with floating widget + web app.",
+  "scripts": {
+    "setup": "cd apps/electron && npm install && cd ../.. && cd apps/desktop && npm install",
+    "dev:electron": "cd apps/electron && npm run dev",
+    "dev:web": "cd apps/desktop && npx next dev",
+    "build:electron": "cd apps/electron && npm run build",
+    "build:web": "cd apps/desktop && npx next build",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,66 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-web:
+    name: Build Web App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build --workspace=apps/web
+        env:
+          NEXT_PUBLIC_API_URL: https://api.edupilot.com
+
+  build-marketing:
+    name: Build Marketing Site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build marketing site
+        run: npm run build --workspace=apps/marketing
+
+  build-desktop:
+    name: Build Desktop App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop Next.js renderer
+        run: npm run build --workspace=apps/desktop
+        env:
+          NEXT_PUBLIC_API_URL: https://api.edupilot.com
