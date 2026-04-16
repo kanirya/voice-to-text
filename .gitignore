@@ -49,3 +49,9 @@ apps/desktop/release/
 # pnpm
 .pnp
 .pnp.js
+
+# Installer binaries (distributed via GitHub Releases)
+*.exe
+*.dmg
+*.AppImage
+*.deb
