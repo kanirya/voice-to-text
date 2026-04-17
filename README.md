@@ -12,7 +12,7 @@
 
 <br />
 
-[⬇️ Download for Windows (.exe)](https://github.com/kanirya/voice-to-text/releases/latest/download/Voice-to-Text-Setup-1.0.0.exe) &nbsp;|&nbsp; [View All Releases](https://github.com/kanirya/voice-to-text/releases)
+[⬇️ Download for Windows (.exe)](https://drive.google.com/uc?export=download&id=1EQga8KJbJlTJoD4FI4xs4w3k3_8TDNjA) &nbsp;|&nbsp; [View on GitHub](https://github.com/kanirya/voice-to-text)
 
 </div>
 
@@ -45,7 +45,7 @@ No internet connection required. Your audio never leaves your device.
 
 ### Windows
 
-> **[⬇️ Download Voice to Text Setup 1.0.0 (.exe)](https://github.com/kanirya/voice-to-text/releases/latest/download/Voice-to-Text-Setup-1.0.0.exe)**
+> **[⬇️ Download Voice to Text Setup 1.0.0 (.exe)](https://drive.google.com/uc?export=download&id=1EQga8KJbJlTJoD4FI4xs4w3k3_8TDNjA)**
 
 The installer will guide you through setup. On first launch, you'll choose a Whisper model to download.
 
